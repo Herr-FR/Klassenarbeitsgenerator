@@ -3,32 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Klassenarbeiten-Designer Pro (Kommentiert)</title>
+    <title>Klassenarbeiten-Designer Pro</title>
     
     <!-- EXTERNE BIBLIOTHEKEN -->
-    <!-- Tailwind CSS für das Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM für die App-Logik -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel ermöglicht die Nutzung von JSX direkt im Browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <style>
-        /* Schriftart & Basiskonfiguration */
+        /* Basis-Styling */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
 
-        /* DRUCK-EINSTELLUNGEN (Wichtig für das A4-Format) */
         @media print {
-            @page { 
-                margin: 0; 
-                size: A4; 
-            }
+            /* Wir setzen margin: 0 im Stylesheet, überschreiben es aber dynamisch im React-Code */
             body { background: white; }
-            /* Elemente mit dieser Klasse werden beim Drucken ausgeblendet (z.B. Sidebar) */
             .print-hide { display: none !important; }
-            /* Verhindert, dass Aufgaben unschön über zwei Seiten umgebrochen werden */
             .print-break-avoid { break-inside: avoid; }
             .preview-container { padding: 0 !important; background: white !important; }
             .a4-page { 
@@ -36,21 +27,25 @@
                 border: none !important; 
                 width: 100% !important; 
                 margin: 0 !important; 
+                height: auto !important;
+                min-height: 29.7cm !important;
+                /* Im Druckmodus entfernen wir das Padding vom Div, 
+                   da wir die echten Seitenränder über @page steuern */
+                padding: 0 !important; 
             }
         }
 
-        /* SCROLLBAR-STYLING für den Editor */
+        /* Editor-Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         
-        /* SCHREIBLINIEN-MUSTER: Erzeugt graue Linien im Abstand von 25px */
+        /* Schreiblinien */
         .line-pattern {
             background-image: linear-gradient(#e2e8f0 1px, transparent 1px);
             background-size: 100% 25px;
         }
 
-        /* Begrenzung der Bildhöhe in der Vorschau */
         .task-image-preview {
             max-height: 200px;
             object-fit: contain;
@@ -64,7 +59,7 @@
         const { useState, useEffect, useRef } = React;
         
         const App = () => {
-            // HAUPT-STATUS: Hier werden alle Daten der Klassenarbeit gespeichert
+            // HAUPT-STATUS
             const [examData, setExamData] = useState({
                 title: '1. Klassenarbeit',
                 subject: 'Wirtschaftskunde',
@@ -74,6 +69,12 @@
                 logoUrl: '',
                 rules: 'Erlaubte Hilfsmittel: Nicht-programmierbarer Taschenrechner.',
                 situation: 'Stellen Sie sich vor, Sie sind Mitarbeiter in einem mittelständischen Unternehmen...',
+                margins: {
+                    top: 2.5,
+                    bottom: 2.5,
+                    left: 2.0,
+                    right: 2.0
+                },
                 tasks: [
                     { 
                         id: 1, 
@@ -87,346 +88,285 @@
                 ]
             });
 
-            // Status für die Ansicht (Editor oder Vorschau-Modus)
             const [activeTab, setActiveTab] = useState('edit');
-            
-            // Referenzen für Datei-Uploads (Logo und JSON-Import)
             const fileInputRef = useRef(null);
             const importFileRef = useRef(null);
 
-            // LOGIK: Berechnung der Gesamtpunktzahl (summiert Haupt- und Unteraufgaben)
-            const calculateTotalPoints = () => {
-                let total = 0;
-                examData.tasks.forEach(task => {
-                    total += Number(task.points || 0);
-                    task.subTasks.forEach(sub => {
-                        total += Number(sub.points || 0);
-                    });
-                });
-                return total;
-            };
+            // LOGIK: Punkteberechnung
+            const totalPoints = examData.tasks.reduce((acc, task) => {
+                const subPoints = task.subTasks.reduce((sAcc, s) => sAcc + Number(s.points || 0), 0);
+                return acc + Number(task.points || 0) + subPoints;
+            }, 0);
 
-            const totalPoints = calculateTotalPoints();
-
-            // FUNKTION: Aktualisiert ein einfaches Feld in den Stammdaten
+            // HANDLER: Stammdaten
             const updateField = (field, value) => setExamData(prev => ({ ...prev, [field]: value }));
-            
-            // FUNKTION: Fügt eine neue Hauptaufgabe hinzu
-            const addTask = () => {
-                const newTask = { 
-                    id: Date.now(), 
-                    text: '', 
-                    points: 0, 
-                    lineCount: 3, 
-                    taskImage: '', 
-                    taskLink: '',
-                    subTasks: []
-                };
-                setExamData(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }));
-            };
-
-            // FUNKTION: Löscht eine Hauptaufgabe
-            const removeTask = (id) => setExamData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
-
-            // FUNKTION: Aktualisiert Werte einer spezifischen Aufgabe
-            const updateTask = (id, field, value) => {
+            const updateMargin = (side, value) => {
                 setExamData(prev => ({
                     ...prev,
-                    tasks: prev.tasks.map(t => t.id === id ? { ...t, [field]: value } : t)
+                    margins: { ...prev.margins, [side]: parseFloat(value) || 0 }
                 }));
             };
 
-            // FUNKTION: Unteraufgabe zu einer bestehenden Aufgabe hinzufügen
+            // HANDLER: Aufgabenverwaltung
+            const addTask = () => {
+                const newTask = { id: Date.now(), text: '', points: 0, lineCount: 3, taskImage: '', taskLink: '', subTasks: [] };
+                setExamData(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }));
+            };
+            const removeTask = (id) => setExamData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
+            const updateTask = (id, field, value) => {
+                setExamData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === id ? { ...t, [field]: value } : t) }));
+            };
+
+            // HANDLER: Unteraufgaben
             const addSubTask = (taskId) => {
                 setExamData(prev => ({
                     ...prev,
-                    tasks: prev.tasks.map(t => {
-                        if (t.id === taskId) {
-                            const newSub = { id: Date.now(), text: '', points: 0, lineCount: 3 };
-                            return { ...t, subTasks: [...t.subTasks, newSub] };
-                        }
-                        return t;
-                    })
+                    tasks: prev.tasks.map(t => t.id === taskId ? { ...t, subTasks: [...t.subTasks, { id: Date.now(), text: '', points: 0, lineCount: 3 }] } : t)
                 }));
             };
-
-            // FUNKTION: Unteraufgabe aktualisieren
             const updateSubTask = (taskId, subId, field, value) => {
                 setExamData(prev => ({
                     ...prev,
-                    tasks: prev.tasks.map(t => {
-                        if (t.id === taskId) {
-                            return {
-                                ...t,
-                                subTasks: t.subTasks.map(sub => sub.id === subId ? { ...sub, [field]: value } : sub)
-                            };
-                        }
-                        return t;
-                    })
+                    tasks: prev.tasks.map(t => t.id === taskId ? { ...t, subTasks: t.subTasks.map(s => s.id === subId ? { ...s, [field]: value } : s) } : t)
                 }));
             };
-
-            // FUNKTION: Unteraufgabe löschen
             const removeSubTask = (taskId, subId) => {
-                setExamData(prev => ({
-                    ...prev,
-                    tasks: prev.tasks.map(t => {
-                        if (t.id === taskId) {
-                            return { ...t, subTasks: t.subTasks.filter(sub => sub.id !== subId) };
-                        }
-                        return t;
-                    })
-                }));
+                setExamData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === taskId ? { ...t, subTasks: t.subTasks.filter(s => s.id !== subId) } : t) }));
             };
 
-            // SPEICHERN: Exportiert den aktuellen Status als JSON-Datei
+            // DATEI-OPERATIONEN
             const handleSaveLocal = () => {
                 const dataStr = JSON.stringify(examData, null, 2);
-                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-                const exportFileDefaultName = `${examData.title || 'klassenarbeit'}.json`;
-
-                const linkElement = document.createElement('a');
-                linkElement.setAttribute('href', dataUri);
-                linkElement.setAttribute('download', exportFileDefaultName);
-                linkElement.click();
+                const blob = new Blob([dataStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${examData.title}.json`;
+                link.click();
             };
 
-            // LADEN: Liest eine JSON-Datei ein und überschreibt den Status
             const handleImportLocal = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-
                 const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const json = JSON.parse(event.target.result);
-                        setExamData(json);
-                    } catch (err) {
-                        alert("Fehler beim Laden der Datei. Bitte stellen Sie sicher, dass es sich um eine gültige JSON-Datei handelt.");
-                    }
+                reader.onload = (ev) => {
+                    try { setExamData(JSON.parse(ev.target.result)); } 
+                    catch(e) { alert("Ungültige Datei"); }
                 };
                 reader.readAsText(file);
             };
 
-            // BILD-UPLOAD: Logo-Handling
-            const handleLogoUpload = (e) => {
+            const handleImageUpload = (id, e, isLogo = false) => {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onloadend = () => updateField('logoUrl', reader.result);
-                    reader.readAsDataURL(file);
-                }
-            };
-
-            // BILD-UPLOAD: Aufgaben-Grafik-Handling
-            const handleTaskImageUpload = (id, e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => updateTask(id, 'taskImage', reader.result);
+                    reader.onloadend = () => {
+                        if (isLogo) updateField('logoUrl', reader.result);
+                        else updateTask(id, 'taskImage', reader.result);
+                    };
                     reader.readAsDataURL(file);
                 }
             };
 
             return (
                 <div className="min-h-screen flex flex-col text-slate-900">
-                    {/* NAVIGATION & AKTIONEN */}
+                    
+                    {/* DYNAMISCHE DRUCK-RÄNDER: Hier fixen wir das Problem */}
+                    <style>
+                        {`
+                            @media print {
+                                @page {
+                                    /* Wir setzen die echten physikalischen Seitenränder des Druckers */
+                                    margin: ${examData.margins.top}cm ${examData.margins.right}cm ${examData.margins.bottom}cm ${examData.margins.left}cm !important;
+                                }
+                            }
+                        `}
+                    </style>
+
                     <header className="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center sticky top-0 z-50 print-hide shadow-sm">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-indigo-600 rounded-lg text-white font-bold text-xl">📝</div>
                             <h1 className="text-lg font-extrabold tracking-tight">Klassenarbeiten-Designer</h1>
                         </div>
-                        
-                        {/* Tab-Wechsler */}
                         <div className="flex bg-slate-100 p-1 rounded-lg">
                             <button onClick={() => setActiveTab('edit')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${activeTab === 'edit' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>Editor</button>
                             <button onClick={() => setActiveTab('preview')} className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${activeTab === 'preview' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>Vorschau</button>
                         </div>
-                        
-                        {/* Export & Drucken */}
-                        <div className="flex gap-2">
-                            <button onClick={handleSaveLocal} className="bg-slate-800 text-white px-4 py-2 rounded-md hover:bg-black shadow-md font-bold transition-all text-xs flex items-center gap-2">
-                                <span>💾 Speichern</span>
-                            </button>
-                            <button onClick={() => window.print()} className="bg-indigo-600 text-white px-5 py-2 rounded-md hover:bg-indigo-700 shadow-md font-bold transition-transform active:scale-95">PDF Drucken</button>
+                        <div className="flex gap-2 text-xs font-bold">
+                            <button onClick={handleSaveLocal} className="bg-slate-800 text-white px-4 py-2 rounded-md hover:bg-black">💾 Speichern</button>
+                            <button onClick={() => window.print()} className="bg-indigo-600 text-white px-5 py-2 rounded-md hover:bg-indigo-700 active:scale-95">PDF Drucken</button>
                         </div>
                     </header>
 
                     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden print:block">
                         
-                        {/* --- LINKER BEREICH: EDITOR --- */}
-                        <aside className={`w-full lg:w-[480px] bg-white border-r border-slate-200 overflow-y-auto p-6 flex flex-col print-hide ${activeTab === 'preview' ? 'hidden' : 'block'}`}>
-                            <div className="flex-1 space-y-8">
-                                {/* Sektion: Stammdaten */}
-                                <section>
-                                    <h2 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-[0.2em]">Allgemeine Infos</h2>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Titel</label>
-                                            <input type="text" value={examData.title} onChange={e => updateField('title', e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500/20" />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <input type="text" placeholder="Fach" value={examData.subject} onChange={e => updateField('subject', e.target.value)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none" />
-                                            <input type="text" placeholder="Klasse" value={examData.class} onChange={e => updateField('class', e.target.value)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none" />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <input type="text" placeholder="Datum" value={examData.date} onChange={e => updateField('date', e.target.value)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none" />
-                                            <input type="text" placeholder="Lehrkraft" value={examData.teacher} onChange={e => updateField('teacher', e.target.value)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none" />
-                                        </div>
-                                        {/* Logo Upload Bereich */}
-                                        <div className="mt-4 border-2 border-dashed border-slate-200 p-4 text-center cursor-pointer rounded-xl bg-slate-50 hover:bg-indigo-50 transition-all" onClick={() => fileInputRef.current.click()}>
-                                            {examData.logoUrl ? <img src={examData.logoUrl} className="h-12 mx-auto mb-2" /> : <div className="text-xl mb-1 opacity-50">🖼️</div>}
-                                            <p className="text-[10px] font-bold text-slate-400">Schullogo hochladen</p>
-                                            <input ref={fileInputRef} type="file" className="hidden" onChange={handleLogoUpload} />
-                                        </div>
-                                    </div>
-                                </section>
-
-                                {/* Sektion: Regeln & Situation */}
-                                <section className="space-y-4">
-                                    <h2 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-[0.2em]">Inhalte</h2>
-                                    <textarea placeholder="Regeln ergänzen..." rows="2" value={examData.rules} onChange={e => updateField('rules', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none" />
-                                    <textarea placeholder="Situation beschreiben..." rows="2" value={examData.situation} onChange={e => updateField('situation', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none" />
-                                </section>
-
-                                {/* Sektion: Aufgaben-Listen Editor */}
-                                <section className="pb-10">
-                                    <div className="flex justify-between items-end mb-4">
-                                        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Aufgaben</h2>
-                                        <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">{totalPoints} Pkt. gesamt</span>
-                                    </div>
-                                    <div className="space-y-6">
-                                        {examData.tasks.map((task, index) => (
-                                            <div key={task.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative group shadow-sm">
-                                                {/* Löschen Button */}
-                                                <button onClick={() => removeTask(task.id)} className="absolute top-3 right-3 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                                                </button>
-                                                
-                                                <div className="text-[10px] font-black text-indigo-500 mb-2 uppercase">Aufgabe {index + 1}</div>
-                                                <textarea value={task.text} onChange={e => updateTask(task.id, 'text', e.target.value)} className="w-full p-2 text-sm border border-slate-200 rounded-lg mb-3 outline-none" placeholder="Hauptaufgabe..." rows="2" />
-                                                
-                                                <div className="grid grid-cols-2 gap-3 mb-4">
-                                                    <input type="number" placeholder="Punkte" value={task.points} onChange={e => updateTask(task.id, 'points', e.target.value)} className="w-full p-2 text-xs border border-slate-200 rounded-lg font-bold" />
-                                                    <input type="number" placeholder="Zeilen" value={task.lineCount} onChange={e => updateTask(task.id, 'lineCount', parseInt(e.target.value) || 0)} className="w-full p-2 text-xs border border-slate-200 rounded-lg font-bold text-center" />
-                                                </div>
-
-                                                {/* UNTERAUFGABEN EDITOR */}
-                                                {task.subTasks.map((sub, subIdx) => (
-                                                    <div key={sub.id} className="bg-white p-3 rounded-lg border border-slate-100 mb-2 relative">
-                                                        <textarea value={sub.text} onChange={e => updateSubTask(task.id, sub.id, 'text', e.target.value)} className="w-full p-1 text-xs border-b mb-2 outline-none" placeholder={`Unteraufgabe ${index+1}.${subIdx+1}...`} />
-                                                        <div className="flex gap-4">
-                                                            <input type="number" placeholder="Pkt." value={sub.points} onChange={e => updateSubTask(task.id, sub.id, 'points', e.target.value)} className="w-full p-1 text-[10px] border rounded" />
-                                                            <input type="number" placeholder="Z." value={sub.lineCount} onChange={e => updateSubTask(task.id, sub.id, 'lineCount', parseInt(e.target.value) || 0)} className="w-full p-1 text-[10px] border rounded" />
-                                                            <button onClick={() => removeSubTask(task.id, sub.id)} className="text-red-300 hover:text-red-500 text-xs font-bold">Löschen</button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-
-                                                {/* Buttons für zusätzliche Medien/Unteraufgaben */}
-                                                <div className="mt-4 flex gap-2">
-                                                    <button onClick={() => addSubTask(task.id)} className="flex-1 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-indigo-100">+ Unteraufgabe</button>
-                                                    <label htmlFor={`img-${task.id}`} className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase text-center cursor-pointer">{task.taskImage ? "Bild ✓" : "Bild"}</label>
-                                                    <input type="file" accept="image/*" id={`img-${task.id}`} className="hidden" onChange={(e) => handleTaskImageUpload(task.id, e)} />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <button onClick={addTask} className="w-full mt-6 py-4 border-2 border-dashed border-slate-200 rounded-xl text-sm font-bold text-slate-400 hover:text-indigo-600 transition-all">+ Aufgabe hinzufügen</button>
-                                </section>
-                            </div>
-
-                            {/* Projektverwaltung (JSON Import/Export) */}
-                            <div className="mt-10 p-4 bg-slate-100 rounded-xl border border-slate-200">
-                                <h3 className="text-[9px] font-black uppercase text-slate-500 mb-3 tracking-widest">Projektverwaltung</h3>
-                                <div className="flex gap-2">
-                                    <button onClick={handleSaveLocal} className="flex-1 py-2 bg-white border border-slate-300 rounded text-[10px] font-bold">Export (JSON)</button>
-                                    <button onClick={() => importFileRef.current.click()} className="flex-1 py-2 bg-white border border-slate-300 rounded text-[10px] font-bold">Import (JSON)</button>
-                                    <input ref={importFileRef} type="file" accept=".json" className="hidden" onChange={handleImportLocal} />
+                        {/* EDITOR SIDEBAR */}
+                        <aside className={`w-full lg:w-[480px] bg-white border-r border-slate-200 overflow-y-auto p-6 space-y-8 print-hide ${activeTab === 'preview' ? 'hidden' : 'block'}`}>
+                            {/* Stammdaten */}
+                            <section className="space-y-3">
+                                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stammdaten</h2>
+                                <input type="text" placeholder="Titel" value={examData.title} onChange={e => updateField('title', e.target.value)} className="w-full p-2 bg-slate-50 border rounded-lg text-sm" />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input type="text" placeholder="Fach" value={examData.subject} onChange={e => updateField('subject', e.target.value)} className="p-2 bg-slate-50 border rounded-lg text-xs" />
+                                    <input type="text" placeholder="Klasse" value={examData.class} onChange={e => updateField('class', e.target.value)} className="p-2 bg-slate-50 border rounded-lg text-xs" />
+                                    <input type="text" placeholder="Datum" value={examData.date} onChange={e => updateField('date', e.target.value)} className="p-2 bg-slate-50 border rounded-lg text-xs" />
+                                    <input type="text" placeholder="Lehrkraft" value={examData.teacher} onChange={e => updateField('teacher', e.target.value)} className="p-2 bg-slate-50 border rounded-lg text-xs font-bold text-indigo-600" />
                                 </div>
-                            </div>
+                                <div className="mt-2 border-2 border-dashed p-3 text-center cursor-pointer rounded-lg bg-slate-50 hover:bg-indigo-50" onClick={() => fileInputRef.current.click()}>
+                                    {examData.logoUrl ? <img src={examData.logoUrl} className="h-10 mx-auto" /> : <p className="text-[9px] font-bold text-slate-400 uppercase">Logo hochladen</p>}
+                                    <input ref={fileInputRef} type="file" className="hidden" onChange={e => handleImageUpload(null, e, true)} />
+                                </div>
+                            </section>
+
+                            {/* Seitenränder */}
+                            <section className="space-y-3">
+                                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seitenränder (cm)</h2>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {['top', 'bottom', 'left', 'right'].map(side => (
+                                        <div key={side}>
+                                            <label className="text-[8px] uppercase font-bold text-slate-400">{side}</label>
+                                            <input type="number" step="0.1" value={examData.margins[side]} onChange={e => updateMargin(side, e.target.value)} className="w-full p-1 border rounded text-xs" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            {/* Inhalte */}
+                            <section className="space-y-4">
+                                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inhalte</h2>
+                                <textarea placeholder="Hinweise & Regeln..." rows="2" value={examData.rules} onChange={e => updateField('rules', e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" />
+                                <textarea placeholder="Situation..." rows="2" value={examData.situation} onChange={e => updateField('situation', e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" />
+                            </section>
+
+                            {/* Aufgaben */}
+                            <section className="space-y-4">
+                                <div className="flex justify-between items-end">
+                                    <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aufgaben</h2>
+                                    <span className="text-[10px] font-black text-indigo-600">{totalPoints} Pkt.</span>
+                                </div>
+                                {examData.tasks.map((task, idx) => (
+                                    <div key={task.id} className="p-4 bg-slate-50 border rounded-xl relative group">
+                                        <button onClick={() => removeTask(task.id)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                        <textarea value={task.text} onChange={e => updateTask(task.id, 'text', e.target.value)} className="w-full p-2 text-xs border rounded-lg mb-2" placeholder="Aufgabe..." rows="2" />
+                                        <div className="grid grid-cols-2 gap-2 mb-2">
+                                            <input type="number" value={task.points} onChange={e => updateTask(task.id, 'points', e.target.value)} className="p-1 border rounded text-xs" placeholder="Pkt." />
+                                            <input type="number" value={task.lineCount} onChange={e => updateTask(task.id, 'lineCount', e.target.value)} className="p-1 border rounded text-xs text-center" placeholder="Zeilen" />
+                                        </div>
+                                        
+                                        {/* Unteraufgaben Editor */}
+                                        <div className="ml-4 space-y-2 mt-2">
+                                            {task.subTasks.map((sub, sIdx) => (
+                                                <div key={sub.id} className="bg-white p-2 border rounded shadow-sm relative">
+                                                    <button onClick={() => removeSubTask(task.id, sub.id)} className="absolute top-1 right-1 text-slate-300">×</button>
+                                                    <input value={sub.text} onChange={e => updateSubTask(task.id, sub.id, 'text', e.target.value)} className="w-full text-[10px] border-b mb-1 outline-none" placeholder="Unteraufgabe..." />
+                                                    <div className="flex gap-2">
+                                                        <input type="number" value={sub.points} onChange={e => updateSubTask(task.id, sub.id, 'points', e.target.value)} className="w-10 text-[9px] border p-0.5 rounded" />
+                                                        <input type="number" value={sub.lineCount} onChange={e => updateSubTask(task.id, sub.id, 'lineCount', e.target.value)} className="w-10 text-[9px] border p-0.5 rounded text-center" />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <button onClick={() => addSubTask(task.id)} className="text-[9px] font-bold text-indigo-500">+ Unteraufgabe</button>
+                                        </div>
+
+                                        <div className="mt-3 pt-3 border-t flex gap-2">
+                                            <label htmlFor={`img-${task.id}`} className="flex-1 py-1 bg-white border text-[9px] font-black text-center cursor-pointer rounded">BILD {task.taskImage ? '✓' : '+'}</label>
+                                            <input type="file" id={`img-${task.id}`} className="hidden" onChange={e => handleImageUpload(task.id, e)} />
+                                        </div>
+                                    </div>
+                                ))}
+                                <button onClick={addTask} className="w-full py-3 border-2 border-dashed rounded-xl text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">+ Aufgabe hinzufügen</button>
+                            </section>
+
+                            <section className="bg-slate-100 p-3 rounded-xl">
+                                <div className="flex gap-2">
+                                    <button onClick={() => importFileRef.current.click()} className="flex-1 bg-white border py-2 text-[10px] font-bold rounded">JSON Import</button>
+                                    <input ref={importFileRef} type="file" className="hidden" accept=".json" onChange={handleImportLocal} />
+                                </div>
+                            </section>
                         </aside>
 
-                        {/* --- RECHTER BEREICH: VORSCHAU (A4 BLATT) --- */}
+                        {/* PREVIEW AREA */}
                         <section className={`flex-1 bg-slate-200 p-4 md:p-12 overflow-y-auto preview-container print:bg-white print:p-0 ${activeTab === 'edit' ? 'hidden lg:block' : 'block'}`}>
-                            <div className="a4-page mx-auto bg-white shadow-2xl min-h-[29.7cm] w-[21cm] p-[2cm] print:shadow-none print:w-full box-border border relative">
-                                
-                                {/* Blatt-Kopf */}
-                                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
+                            <div 
+                                className="a4-page mx-auto bg-white shadow-2xl min-h-[29.7cm] w-[21cm] border relative"
+                                style={{
+                                    /* In der Bildschirm-Vorschau simulieren wir das Padding */
+                                    paddingTop: `${examData.margins.top}cm`,
+                                    paddingBottom: `${examData.margins.bottom}cm`,
+                                    paddingLeft: `${examData.margins.left}cm`,
+                                    paddingRight: `${examData.margins.right}cm`
+                                }}
+                            >
+                                {/* Header */}
+                                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-8">
                                     <div className="flex-1">
-                                        <div className="grid grid-cols-2 gap-x-12 gap-y-3 text-[9px] mb-6 uppercase font-bold text-slate-500">
-                                            <div className="border-b-2 border-slate-900 h-9 flex items-end">Name:</div>
-                                            <div className="border-b border-slate-300 h-9 flex flex-col justify-end">
-                                                <span className="text-[7px]">Datum:</span>
-                                                <span className="text-slate-900 text-xs font-black leading-none pb-1">{examData.date}</span>
+                                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[8px] uppercase font-bold text-slate-400 mb-6">
+                                            <div className="border-b-2 border-slate-900 h-8 flex items-end text-slate-900">Name:</div>
+                                            <div className="border-b border-slate-300 h-8 flex flex-col justify-end">
+                                                <span>Datum:</span>
+                                                <span className="text-slate-900 font-black">{examData.date}</span>
                                             </div>
-                                            <div className="border-b border-slate-300 h-9 flex flex-col justify-end">
-                                                <span className="text-[7px]">Klasse:</span>
-                                                <span className="text-slate-900 text-xs font-black leading-none pb-1">{examData.class}</span>
+                                            <div className="border-b border-slate-300 h-8 flex flex-col justify-end">
+                                                <span>Klasse:</span>
+                                                <span className="text-slate-900 font-black">{examData.class}</span>
                                             </div>
-                                            <div className="border-b border-slate-300 h-9 flex flex-col justify-end">
-                                                <span className="text-[7px]">Lehrkraft:</span>
-                                                <span className="text-slate-900 text-xs font-black leading-none pb-1">{examData.teacher}</span>
+                                            <div className="border-b border-slate-300 h-8 flex flex-col justify-end">
+                                                <span>Lehrkraft:</span>
+                                                <span className="text-indigo-600 font-black">{examData.teacher}</span>
                                             </div>
                                         </div>
-                                        <h2 className="text-2xl font-[900] uppercase tracking-tighter leading-none text-slate-900">{examData.title}</h2>
-                                        <div className="text-lg text-slate-500 font-medium italic mt-1">{examData.subject}</div>
+                                        <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">{examData.title}</h2>
+                                        <div className="text-base text-slate-500 italic mt-1 font-medium">{examData.subject}</div>
                                     </div>
-                                    {examData.logoUrl && <img src={examData.logoUrl} className="max-h-20 max-w-[4cm] object-contain ml-6" />}
+                                    {examData.logoUrl && <img src={examData.logoUrl} className="max-h-16 max-w-[3.5cm] object-contain ml-4" />}
                                 </div>
 
-                                {/* Blatt-Inhalt (Regeln & Situation) */}
+                                {/* Rules & Situation */}
                                 {examData.rules && (
-                                    <div className="mb-6 p-4 border rounded-lg bg-slate-50/50">
-                                        <span className="font-black text-[9px] uppercase mb-1 block tracking-[0.15em] text-slate-400">Hinweise:</span>
-                                        <p className="text-[12px] leading-relaxed text-slate-600">{examData.rules}</p>
+                                    <div className="mb-6 p-4 border border-slate-200 rounded-lg text-[11px] text-slate-600 leading-relaxed italic">
+                                        <span className="font-black text-[8px] uppercase tracking-widest text-slate-400 block mb-1 not-italic">Hinweise:</span>
+                                        {examData.rules}
                                     </div>
                                 )}
 
                                 {examData.situation && (
-                                    <div className="mb-8 p-5 bg-slate-50 border-l-4 border-slate-400 rounded-r-xl">
-                                        <span className="font-black text-[9px] uppercase mb-2 block tracking-[0.15em] text-slate-400">Situation:</span>
-                                        <p className="text-[13px] leading-relaxed italic text-slate-700">{examData.situation}</p>
+                                    <div className="mb-10 p-5 bg-slate-50 border-l-4 border-slate-400 rounded-r-xl text-[12px] leading-relaxed text-slate-700 italic">
+                                        <span className="font-black text-[8px] uppercase tracking-widest text-slate-400 block mb-1 not-italic">Situation:</span>
+                                        {examData.situation}
                                     </div>
                                 )}
 
-                                {/* AUFGABEN-RENDERING */}
+                                {/* Tasks */}
                                 <div className="space-y-12">
-                                    {examData.tasks.map((task, index) => (
+                                    {examData.tasks.map((task, idx) => (
                                         <div key={task.id} className="print-break-avoid">
-                                            {/* Hauptaufgabe Zeile */}
                                             <div className="flex justify-between items-start mb-2">
-                                                <div className="flex-1 text-[14px] leading-snug">
-                                                    <span className="font-[900] mr-2 text-base inline-block border-b-2 border-indigo-500">Aufgabe {index + 1}</span> 
-                                                    <span className="font-medium text-slate-800">{task.text || "..."}</span>
+                                                <div className="flex-1 text-[13px] leading-snug">
+                                                    <span className="font-black mr-2 text-base border-b-2 border-indigo-400">Aufgabe {idx + 1}</span> 
+                                                    <span className="font-medium">{task.text || "..."}</span>
                                                 </div>
-                                                <div className="flex flex-col items-center ml-4">
-                                                    <div className="border-2 border-slate-900 px-2 py-0.5 font-black text-xs min-w-[40px] text-center">/ {task.points}</div>
-                                                </div>
+                                                <div className="border-2 border-slate-900 px-2 py-0.5 font-black text-xs min-w-[35px] text-center ml-4">/ {task.points}</div>
                                             </div>
                                             
-                                            {/* Bild-Grafik anzeigen falls vorhanden */}
-                                            {task.taskImage && <img src={task.taskImage} className="task-image-preview block my-4 rounded border mx-auto" />}
+                                            {task.taskImage && <img src={task.taskImage} className="task-image-preview block my-4 rounded mx-auto border" />}
 
-                                            {/* Schreiblinien (nur wenn keine Unteraufgaben existieren) */}
                                             {task.lineCount > 0 && task.subTasks.length === 0 && (
-                                                <div className="mt-3 border-t border-slate-200 line-pattern" style={{ height: `${task.lineCount * 25}px` }}></div>
+                                                <div className="mt-3 border-t line-pattern" style={{ height: `${task.lineCount * 25}px` }}></div>
                                             )}
 
-                                            {/* Unteraufgaben-Listen Rendering */}
                                             {task.subTasks.length > 0 && (
                                                 <div className="mt-6 space-y-8 pl-8">
-                                                    {task.subTasks.map((sub, subIdx) => (
+                                                    {task.subTasks.map((sub, sIdx) => (
                                                         <div key={sub.id} className="print-break-avoid">
-                                                            <div className="flex justify-between items-start mb-2 text-[13px]">
+                                                            <div className="flex justify-between items-start text-[12px] mb-2">
                                                                 <div className="flex-1">
-                                                                    <span className="font-bold mr-2">{index + 1}.{subIdx + 1}</span>
+                                                                    <span className="font-bold mr-2 text-slate-400">{idx + 1}.{sIdx + 1}</span>
                                                                     <span>{sub.text || "..."}</span>
                                                                 </div>
-                                                                <div className="border border-slate-900 px-1.5 py-0.5 font-bold text-[10px] min-w-[35px] text-center">/ {sub.points}</div>
+                                                                <div className="border border-slate-900 px-1.5 font-bold text-[10px] min-w-[30px] text-center ml-2">/ {sub.points}</div>
                                                             </div>
                                                             {sub.lineCount > 0 && (
-                                                                <div className="mt-2 border-t border-slate-200 line-pattern" style={{ height: `${sub.lineCount * 25}px` }}></div>
+                                                                <div className="mt-2 border-t line-pattern" style={{ height: `${sub.lineCount * 25}px` }}></div>
                                                             )}
                                                         </div>
                                                     ))}
@@ -436,25 +376,24 @@
                                     ))}
                                 </div>
 
-                                {/* BLATT-FUSS (Gesamtpunkte & Note) */}
+                                {/* Footer */}
                                 <div className="mt-20 pt-8 border-t-2 border-slate-900 grid grid-cols-2 gap-10">
-                                    <div className="flex flex-col justify-end text-[10px] italic text-slate-400">Viel Erfolg!</div>
-                                    <div className="flex flex-col gap-3">
-                                        <div className="flex items-center justify-between bg-slate-900 text-white p-3 rounded-lg shadow-md">
+                                    <div className="flex items-end text-[9px] italic text-slate-400">Viel Erfolg beim Bearbeiten!</div>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between bg-slate-900 text-white p-3 rounded-lg">
                                             <span className="font-black text-[9px] uppercase tracking-widest">Gesamtpunktzahl:</span>
                                             <div className="font-black text-xl">/ {totalPoints}</div>
                                         </div>
                                         <div className="flex items-center justify-between border-2 border-slate-900 p-3 rounded-lg">
-                                            <span className="font-black text-[9px] uppercase tracking-widest text-slate-900">Note:</span>
-                                            <div className="w-10 h-5"></div>
+                                            <span className="font-black text-[9px] uppercase tracking-widest">Note:</span>
+                                            <div className="w-10"></div>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                {/* Lizenzhinweis beim Drucken */}
-                                <div className="hidden print:block absolute bottom-4 left-[2cm] right-[2cm] flex justify-between text-[7px] text-slate-300 font-bold uppercase pt-2 border-t">
-                                    <span>Designer: {examData.teacher}</span>
-                                    <span>Lizenz: CC BY-NC-SA 4.0</span>
+
+                                <div className="hidden print:block absolute bottom-4 left-[2cm] right-[2cm] border-t pt-2 text-[6px] text-slate-300 font-bold uppercase tracking-widest flex justify-between">
+                                    <span>{examData.teacher} • Klassenarbeiten-Designer</span>
+                                    <span>CC BY-NC-SA 4.0</span>
                                 </div>
                             </div>
                         </section>
