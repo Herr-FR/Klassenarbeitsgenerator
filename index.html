@@ -55,6 +55,7 @@
                 date: new Date().toLocaleDateString('de-DE'),
                 teacher: 'Max Mustermann',
                 logoUrl: '',
+                rules: 'Erlaubte Hilfsmittel: Nicht-programmierbarer Taschenrechner. Die Bearbeitungszeit beträgt 45 Minuten.',
                 situation: 'Stellen Sie sich vor, Sie sind Mitarbeiter in einem mittelständischen Unternehmen...',
                 tasks: [
                     { 
@@ -166,6 +167,11 @@
                                             <input ref={fileInputRef} type="file" className="hidden" onChange={handleLogoUpload} />
                                         </div>
                                     </div>
+                                </section>
+
+                                <section>
+                                    <h2 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-[0.2em]">Regeln & Hinweise (Optional)</h2>
+                                    <textarea rows="3" value={examData.rules} onChange={e => updateField('rules', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 leading-relaxed" placeholder="Regeln ergänzen (z. B. Hilfsmittel)..." />
                                 </section>
 
                                 <section>
@@ -287,6 +293,14 @@
                                     </div>
                                     {examData.logoUrl && <img src={examData.logoUrl} className="max-h-20 max-w-[4cm] object-contain ml-6" />}
                                 </div>
+
+                                {/* Rules Section (Optional) */}
+                                {examData.rules && (
+                                    <div className="mb-6 p-4 border border-slate-200 rounded-lg bg-slate-50/50">
+                                        <span className="font-black text-[9px] uppercase mb-1 block tracking-[0.15em] text-slate-400">Hinweise & Regeln:</span>
+                                        <p className="text-[12px] leading-relaxed text-slate-600">{examData.rules}</p>
+                                    </div>
+                                )}
 
                                 {/* Situation Section */}
                                 {examData.situation && (
