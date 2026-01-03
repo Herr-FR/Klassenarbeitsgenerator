@@ -32,24 +32,13 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
-        // Lucide Icon Component Wrapper
-        const Icon = ({ name, size = 20, className = "" }) => {
-            const iconRef = useRef(null);
-            useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            }, [name]);
-            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
-        };
-
         const App = () => {
             const [examData, setExamData] = useState({
                 title: '1. Klassenarbeit',
                 subject: 'Wirtschaftskunde',
                 class: 'Klasse 10b',
                 date: new Date().toLocaleDateString('de-DE'),
-                teacher: 'Max Mustermann',
+                teacher: 'Dein Name', // Hier den Namen für die Lizenz eintragen
                 logoUrl: '',
                 situation: 'Sie arbeiten als Assistent/in der Geschäftsführung bei der "TechSolutions GmbH"...',
                 tasks: [
@@ -108,91 +97,138 @@
 
                     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden print:block">
                         {/* Sidebar */}
-                        <aside className={`w-full lg:w-[400px] bg-white border-r border-slate-200 overflow-y-auto p-6 space-y-6 print-hide ${activeTab === 'preview' ? 'hidden' : 'block'}`}>
-                            <section>
-                                <h2 className="text-xs font-bold text-slate-400 uppercase mb-4">Stammdaten</h2>
-                                <input type="text" placeholder="Titel" value={examData.title} onChange={e => updateField('title', e.target.value)} className="w-full mb-2 p-2 bg-slate-50 border rounded" />
-                                <div className="grid grid-cols-2 gap-2">
-                                    <input type="text" placeholder="Fach" value={examData.subject} onChange={e => updateField('subject', e.target.value)} className="p-2 bg-slate-50 border rounded" />
-                                    <input type="text" placeholder="Klasse" value={examData.class} onChange={e => updateField('class', e.target.value)} className="p-2 bg-slate-50 border rounded" />
-                                </div>
-                                <div className="mt-4 border-2 border-dashed p-4 text-center cursor-pointer rounded" onClick={() => fileInputRef.current.click()}>
-                                    {examData.logoUrl ? <img src={examData.logoUrl} className="h-12 mx-auto mb-2" /> : <p className="text-xs text-slate-400">Klick zum Logo-Upload</p>}
-                                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleLogoUpload} />
-                                </div>
-                            </section>
-
-                            <section>
-                                <h2 className="text-xs font-bold text-slate-400 uppercase mb-4">Situation</h2>
-                                <textarea rows="3" value={examData.situation} onChange={e => updateField('situation', e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-sm" />
-                            </section>
-
-                            <section className="pb-10">
-                                <div className="flex justify-between mb-4">
-                                    <h2 className="text-xs font-bold text-slate-400 uppercase">Aufgaben</h2>
-                                    <span className="text-xs font-bold text-indigo-600">{totalPoints} Pkt.</span>
-                                </div>
-                                {examData.tasks.map((task, index) => (
-                                    <div key={task.id} className="p-3 bg-slate-50 border rounded mb-3 relative">
-                                        <button onClick={() => removeTask(task.id)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500">×</button>
-                                        <textarea value={task.text} onChange={e => updateTask(task.id, 'text', e.target.value)} className="w-full p-1 text-sm border-none bg-transparent mb-2" placeholder="Fragestellung..." />
-                                        <div className="flex gap-2">
-                                            <input type="number" value={task.points} onChange={e => updateTask(task.id, 'points', e.target.value)} className="w-16 p-1 text-xs border rounded" title="Punkte" />
-                                            <input type="number" value={task.space} onChange={e => updateTask(task.id, 'space', e.target.value)} className="w-16 p-1 text-xs border rounded" title="Platz" />
-                                        </div>
+                        <aside className={`w-full lg:w-[400px] bg-white border-r border-slate-200 overflow-y-auto p-6 flex flex-col print-hide ${activeTab === 'preview' ? 'hidden' : 'block'}`}>
+                            <div className="flex-1 space-y-6">
+                                <section>
+                                    <h2 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Stammdaten</h2>
+                                    <input type="text" placeholder="Titel" value={examData.title} onChange={e => updateField('title', e.target.value)} className="w-full mb-2 p-2 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-indigo-500" />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input type="text" placeholder="Fach" value={examData.subject} onChange={e => updateField('subject', e.target.value)} className="p-2 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-indigo-500" />
+                                        <input type="text" placeholder="Klasse" value={examData.class} onChange={e => updateField('class', e.target.value)} className="p-2 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-indigo-500" />
                                     </div>
-                                ))}
-                                <button onClick={addTask} className="w-full py-2 border-2 border-dashed rounded text-sm font-bold text-slate-400 hover:text-indigo-600">+ Aufgabe</button>
-                            </section>
+                                    <input type="text" placeholder="Dein Name (Lehrkraft)" value={examData.teacher} onChange={e => updateField('teacher', e.target.value)} className="w-full mt-2 p-2 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-indigo-500 text-sm" />
+                                    
+                                    <div className="mt-4 border-2 border-dashed p-4 text-center cursor-pointer rounded bg-slate-50 hover:bg-slate-100 transition-colors" onClick={() => fileInputRef.current.click()}>
+                                        {examData.logoUrl ? <img src={examData.logoUrl} className="h-12 mx-auto mb-2" /> : <p className="text-xs text-slate-400">Klick zum Logo-Upload</p>}
+                                        <input ref={fileInputRef} type="file" className="hidden" onChange={handleLogoUpload} />
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h2 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Situation</h2>
+                                    <textarea rows="3" value={examData.situation} onChange={e => updateField('situation', e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-sm outline-none focus:ring-1 focus:ring-indigo-500" />
+                                </section>
+
+                                <section className="pb-10">
+                                    <div className="flex justify-between mb-4">
+                                        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Aufgaben</h2>
+                                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{totalPoints} Pkt.</span>
+                                    </div>
+                                    {examData.tasks.map((task, index) => (
+                                        <div key={task.id} className="p-3 bg-slate-50 border rounded mb-3 relative group">
+                                            <button onClick={() => removeTask(task.id)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                            <textarea value={task.text} onChange={e => updateTask(task.id, 'text', e.target.value)} className="w-full p-1 text-sm border-none bg-transparent mb-2 outline-none" placeholder="Fragestellung..." />
+                                            <div className="flex gap-2">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[9px] uppercase font-bold text-slate-400">Punkte</span>
+                                                    <input type="number" value={task.points} onChange={e => updateTask(task.id, 'points', e.target.value)} className="w-16 p-1 text-xs border rounded bg-white" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[9px] uppercase font-bold text-slate-400">Platz</span>
+                                                    <input type="number" step="25" value={task.space} onChange={e => updateTask(task.id, 'space', e.target.value)} className="w-16 p-1 text-xs border rounded bg-white" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button onClick={addTask} className="w-full py-2 border-2 border-dashed rounded text-sm font-bold text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all">+ Aufgabe hinzufügen</button>
+                                </section>
+                            </div>
+
+                            {/* LIZENZ FOOTER IM SIDEBAR */}
+                            <footer className="mt-6 pt-6 border-t border-slate-100 text-[10px] text-slate-400">
+                                <p className="mb-2 font-semibold uppercase tracking-tighter">Lizenzhinweis</p>
+                                <div className="flex items-start gap-2">
+                                    <div className="flex-1">
+                                        Dieses Projekt steht unter der <br/>
+                                        <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.de" target="_blank" className="text-indigo-500 hover:underline font-bold">
+                                            CC BY-NC-SA 4.0 Lizenz
+                                        </a>.<br/>
+                                        &copy; {new Date().getFullYear()} {examData.teacher || 'Der Autor'}
+                                    </div>
+                                    <img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-nc-sa.svg" className="w-16 opacity-60" alt="CC BY-NC-SA" />
+                                </div>
+                            </footer>
                         </aside>
 
                         {/* Preview */}
                         <section className={`flex-1 bg-slate-200 p-8 print:bg-white print:p-0 ${activeTab === 'edit' ? 'hidden lg:block' : 'block'}`}>
-                            <div className="mx-auto bg-white shadow-xl min-h-[29.7cm] w-[21cm] p-[2cm] print:shadow-none print:w-full">
+                            <div className="mx-auto bg-white shadow-xl min-h-[29.7cm] w-[21cm] p-[2cm] print:shadow-none print:w-full box-border border border-slate-300 print:border-none">
                                 <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-8">
-                                    <div>
-                                        <div className="grid grid-cols-2 gap-4 text-[10px] mb-4">
-                                            <div className="border-b border-black w-40">Name:</div>
-                                            <div className="border-b border-black">Datum: {examData.date}</div>
-                                            <div className="border-b border-black">Klasse: {examData.class}</div>
-                                            <div className="border-b border-black">Lehrkraft: {examData.teacher}</div>
+                                    <div className="flex-1">
+                                        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[10px] mb-6">
+                                            <div className="border-b border-black h-8 flex flex-col justify-between">
+                                                <span className="font-bold uppercase text-slate-400">Name:</span>
+                                            </div>
+                                            <div className="border-b border-black h-8 flex flex-col justify-between">
+                                                <span className="font-bold uppercase text-slate-400">Datum:</span>
+                                                <span className="text-sm">{examData.date}</span>
+                                            </div>
+                                            <div className="border-b border-black h-8 flex flex-col justify-between">
+                                                <span className="font-bold uppercase text-slate-400">Klasse:</span>
+                                                <span className="text-sm">{examData.class}</span>
+                                            </div>
+                                            <div className="border-b border-black h-8 flex flex-col justify-between">
+                                                <span className="font-bold uppercase text-slate-400">Lehrkraft:</span>
+                                                <span className="text-sm">{examData.teacher}</span>
+                                            </div>
                                         </div>
-                                        <h2 className="text-2xl font-black uppercase">{examData.title}</h2>
-                                        <div className="text-lg text-slate-600 italic">{examData.subject}</div>
+                                        <h2 className="text-3xl font-black uppercase tracking-tight">{examData.title}</h2>
+                                        <div className="text-xl text-slate-600 font-medium italic">{examData.subject}</div>
                                     </div>
-                                    {examData.logoUrl && <img src={examData.logoUrl} className="h-20 object-contain" />}
+                                    {examData.logoUrl && <img src={examData.logoUrl} className="max-h-24 max-w-40 object-contain ml-8" />}
                                 </div>
 
                                 {examData.situation && (
-                                    <div className="mb-8 p-4 bg-slate-50 border-l-4 border-slate-300 text-sm italic">
-                                        <span className="font-bold not-italic block text-[10px] uppercase mb-1">Situation:</span>
+                                    <div className="mb-10 p-6 bg-slate-50 border-l-4 border-slate-300 text-sm italic rounded-r-lg">
+                                        <span className="font-bold not-italic block text-[10px] uppercase mb-1 tracking-widest text-slate-400">Handlungssituation:</span>
                                         {examData.situation}
                                     </div>
                                 )}
 
-                                <div className="space-y-10">
+                                <div className="space-y-12">
                                     {examData.tasks.map((task, index) => (
                                         <div key={task.id} className="print-break-avoid">
-                                            <div className="flex justify-between mb-2">
-                                                <div className="flex-1"><span className="font-bold">Aufgabe {index + 1}:</span> {task.text}</div>
-                                                <div className="border-2 border-black px-2 py-1 font-bold text-sm min-w-[40px] text-center ml-4">/ {task.points}</div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex-1 text-[15px]"><span className="font-bold mr-2 text-lg">Aufgabe {index + 1}:</span> {task.text}</div>
+                                                <div className="flex flex-col items-center ml-4">
+                                                    <span className="text-[8px] uppercase font-bold text-slate-400 mb-1">Punkte</span>
+                                                    <div className="border-2 border-black px-2 py-1 font-bold text-sm min-w-[45px] text-center">/ {task.points}</div>
+                                                </div>
                                             </div>
                                             <LinePattern height={task.space} />
                                         </div>
                                     ))}
                                 </div>
 
-                                <div className="mt-20 pt-4 border-t-2 border-black flex justify-end gap-8">
-                                    <div className="flex flex-col items-end">
-                                        <div className="flex items-center gap-4">
-                                            <span className="font-bold text-xs">Gesamtpunktzahl:</span>
-                                            <div className="border-2 border-black w-16 h-8 flex items-center justify-center font-bold">/ {totalPoints}</div>
+                                <div className="mt-20 pt-8 border-t-2 border-black flex justify-end gap-12">
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[10px] italic text-slate-400">Viel Erfolg!</span>
+                                    </div>
+                                    <div className="flex flex-col gap-4">
+                                        <div className="flex items-center justify-between gap-6 bg-slate-900 text-white p-3 rounded shadow-sm">
+                                            <span className="font-bold text-xs uppercase tracking-widest">Gesamt:</span>
+                                            <div className="font-black text-xl">/ {totalPoints}</div>
                                         </div>
-                                        <div className="flex items-center gap-4 mt-2">
-                                            <span className="font-bold text-xs">Note:</span>
-                                            <div className="border-2 border-black w-16 h-8"></div>
+                                        <div className="flex items-center justify-between gap-6 border-2 border-black p-3 rounded">
+                                            <span className="font-bold text-xs uppercase tracking-widest">Note:</span>
+                                            <div className="w-10"></div>
                                         </div>
                                     </div>
+                                </div>
+                                
+                                {/* LIZENZ IM DRUCK (Optional, sehr dezent) */}
+                                <div className="hidden print:block absolute bottom-4 left-[2cm] text-[8px] text-slate-300 italic">
+                                    Erstellt mit dem Klassenarbeiten-Designer (CC BY-NC-SA 4.0 - {examData.teacher})
                                 </div>
                             </div>
                         </section>
